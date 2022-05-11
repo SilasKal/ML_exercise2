@@ -12,34 +12,18 @@ def kmeans(data, ncluster):
     while improving:
         centroid_assign, dist_matrix = assign_centroid(data,
                                                        centroids)  # assign data points to centroids and calculate distance matrix
-        assignments.append(centroid_assign)  # append current assignment to assignmentlist
-        new_centroids = np.array([])  # intialize array to save new centroids
-        for i in range(ncluster):  # for every centroid relocate by calculating mean of assigned data
-            new_centroid = calculate_mean_of_data(centroid_assign, data, i)
-            new_centroids = np.append(new_centroids, new_centroid)
+        assignments.append(centroid_assign)  # append current assignment to assignment
+        centroid_assign = np.append(centroid_assign, centroid_assign,
+                                    axis=1)  # append centroid assign to centroid assign to get same shape as data
+        centroid_assign = np.append(centroid_assign, centroid_assign, axis=1)
+        centroids = np.array([np.array([data[centroid_assign == i]]).reshape(-1, 4).mean(axis=0) for i in range(
+            ncluster)])  # calculating new centroids by calculating mean of assigned data column-wise
         if len(assignments) > 1:  # checking whether assignment still changes
             if assignments[0].all() == assignments[1].all():
                 improving = False
             else:
                 assignments = assignments[1:]
     return centroids, dist_matrix, centroid_assign
-
-
-def calculate_mean_of_data(centroid_assign, data, centroid_number):
-    filterassign = []
-    for a in centroid_assign:  # creating filter list to filter data by assignment to centroid
-        if a == centroid_number:
-            filterassign.append(True)
-        else:
-            filterassign.append(False)
-    new_data = data[filterassign]  # data assigned to current centroid
-    new_centroid = []
-    for i in range(new_data.shape[1]):  # calculating mean of assigned data columnwise for relocation
-        if len(new_data[:, i]) != 0:
-            new_centroid.append(np.mean(new_data[:, i]))
-        else:
-            new_centroid.append(0)
-    return new_centroid
 
 
 def init_centroids(k, data):
@@ -53,11 +37,12 @@ def init_centroids(k, data):
 def assign_centroid(data, centroids):
     ncluster = centroids.shape[0]
     dist = np.matrix(np.ones((150, ncluster)) * np.inf)  # initializing array with infinity as values
-    for i in range(0, ncluster):
-        dist = np.append(dist, np.linalg.norm(data - centroids[i], axis=1).reshape(-1, 1),
+    for k in range(0, ncluster):
+        dist = np.append(dist, np.linalg.norm(data - centroids[k], axis=1).reshape(-1, 1),
                          axis=1)  # appending euclidean distance between data points an centroids to array
     dist_matrix = dist[:, ncluster:]  # slicing to remove infinity values
     assignment = np.argmin(dist, axis=1)  # assigning data points to closest centroid
+    assignment = assignment - ncluster
     return assignment, dist_matrix
 
 
@@ -80,8 +65,8 @@ def number1():
 
 def number2():
     distance_lst = []  # initializing distance list to plot later
-    for i in range(1, 11):
-        centroids, dist_matrix = kmeans(iris_data, i)[:2]  # executing kmeans
+    for j in range(1, 11):
+        centroids, dist_matrix = kmeans(iris_data, j)[:2]  # executing kmeans
         mean_distance = np.mean(dist_matrix.min(axis=1))  # calculating mean distance
         distance_lst.append(mean_distance)  # saving mean distance for every ncluster
     plt.title('Optimal Number of Clusters')  # mean cluster distance for ncluster 1-10
