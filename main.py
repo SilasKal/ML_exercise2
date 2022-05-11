@@ -1,114 +1,96 @@
-import random
-
-import numpy
-import numpy as np
-import sklearn
-from sklearn import datasets
 import matplotlib.pyplot as plt
+import numpy as np
+from sklearn import datasets
 
-data = datasets.load_iris().data
+iris_data = datasets.load_iris().data
 
 
 def kmeans(data, ncluster):
-    centroids = init_centroids(ncluster, data)
-    error = np.array([])
+    centroids = init_centroids(ncluster, data)  # initialize centroids by randomly creating them
+    assignments = []  # list for checking whether assignment changes
     improving = True
-    i = 0
     while improving:
-        centroid_assign, iter_error = assign_centroid(data, centroids)
-        # print(centroid_assign)
-        error = np.append(error, np.sum(iter_error))
-        # print("error", error, i)
-        # print("assign", centroid_assign)
-        break
-        new_centroids = []
-        for j in range(ncluster):
-            new_centroid1 = calculate_mean_of_data(centroid_assign, data, j)
-            if new_centroid1 != None:
-                new_centroids.append(new_centroid1)
+        centroid_assign, dist_matrix = assign_centroid(data,
+                                                       centroids)  # assign data points to centroids and calculate distance matrix
+        assignments.append(centroid_assign)  # append current assignment to assignmentlist
+        new_centroids = np.array([])  # intialize array to save new centroids
+        for i in range(ncluster):  # for every centroid relocate by calculating mean of assigned data
+            new_centroid = calculate_mean_of_data(centroid_assign, data, i)
+            new_centroids = np.append(new_centroids, new_centroid)
+        if len(assignments) > 1:  # checking whether assignment still changes
+            if assignments[0].all() == assignments[1].all():
+                improving = False
             else:
-                new_centroids.append(centroids[j])
-        centroids = np.array(new_centroids)
-        # plt.scatter(data[:, 0], data[:, 1], marker='o')
-        # plt.scatter(centroids[:, 0], centroids[:, 1], marker='o', s=300)
-        # plt.show()
-        print("new centroids iter", centroids, error)
-        if (len(error)<2):
-            pass
-        else:
-            if i < len(error):
-                if (round(error[i-1],3) == round(error[i], 3)):
-                    improving = False
-        i += 1
-    centroid_assign, iter_error = assign_centroid(data, centroids)
-    # print(centroid_assign, iter_error)
-    # print("centroids", centroids)
-    new_centroids = []
-    for p in range(ncluster):
-        new_centroid1 = calculate_mean_of_data(centroid_assign, data, p)
-        if new_centroid1 != None:
-            new_centroids.append(new_centroid1)
-        else:
-            new_centroids.append(centroids[p])
-    centroids = np.array(new_centroids)
-    print("new centroid list ende", centroids, "itererror", iter_error)
-    return (centroid_assign, iter_error, centroids)
+                assignments = assignments[1:]
+    return centroids, dist_matrix, centroid_assign
+
+
 def calculate_mean_of_data(centroid_assign, data, centroid_number):
     filterassign = []
-    for index, a in enumerate(centroid_assign):
+    for a in centroid_assign:  # creating filter list to filter data by assignment to centroid
         if a == centroid_number:
             filterassign.append(True)
         else:
             filterassign.append(False)
-    new_data = data[filterassign]
+    new_data = data[filterassign]  # data assigned to current centroid
     new_centroid = []
-    for i in range(new_data.shape[1]):  # normalizing every column separately
+    for i in range(new_data.shape[1]):  # calculating mean of assigned data columnwise for relocation
         if len(new_data[:, i]) != 0:
-            new_centroid.append(np.mean(new_data[:, i]))  # change current variable to normalized data
+            new_centroid.append(np.mean(new_data[:, i]))
         else:
             new_centroid.append(0)
-    print("n_centroid", new_centroid)
-    # print("mean data", new_data)
     return new_centroid
 
-def euclideandistance(data1, data2):
-    distance = np.sqrt(np.sum((data1 - data2) ** 2))
-    return distance
 
 def init_centroids(k, data):
-    numberdim = data.shape[1]
-    centroid_min = np.min(data)
-    centroid_max = np.max(data)
-    centroids = []
-    for i in range(k):
-        centroid = np.random.uniform(centroid_min, centroid_max, numberdim)
-        # centroid = np.random.uniform(0, 1000, numberdim)
-        centroids.append(centroid)
+    n_indices = np.random.choice(range(data.shape[0]), size=k,
+                                 replace=False)  # selecting random data point to initialize centroids randomly
+    centroids = [data[x] for x in n_indices]
     centroids = np.array(centroids)
-    # plt.scatter(data[:, 0], data[:, 1], marker='o')
-    # plt.scatter(centroids[:, 0], centroids[:, 1], marker='o', s=300)
-    # plt.show()
     return centroids
 
-def assign_centroid(data, centroids):
-    dimension = data.shape[0]
-    centroid_assign = []
-    centroid_errors = []
-    k = centroids.shape[0]
-    for i in range(dimension):
-        errors = np.array([])
-        for centroid in range(k):
-            distance = euclideandistance(centroids[centroid, :2], data[i, :2])
-            errors = np.append(errors, distance)
-        closest_centroid = np.where(errors == np.amin(errors))[0].tolist()[0]
-        centroid_error = np.amin(errors)
-        centroid_assign.append(closest_centroid)
-        centroid_errors.append(centroid_error)
-        # print("errors", centroid_errors)
-    return (centroid_assign, centroid_errors)
 
-for i in range(1,10):
-    centroids = kmeans(data, i)[2]
-    plt.scatter(data[:,0], data[:,1],  marker = 'o')
-    plt.scatter(centroids[:,0], centroids[:,1],  marker = 'o', s=300)
+def assign_centroid(data, centroids):
+    ncluster = centroids.shape[0]
+    dist = np.matrix(np.ones((150, ncluster)) * np.inf)  # initializing array with infinity as values
+    for i in range(0, ncluster):
+        dist = np.append(dist, np.linalg.norm(data - centroids[i], axis=1).reshape(-1, 1),
+                         axis=1)  # appending euclidean distance between data points an centroids to array
+    dist_matrix = dist[:, ncluster:]  # slicing to remove infinity values
+    assignment = np.argmin(dist, axis=1)  # assigning data points to closest centroid
+    return assignment, dist_matrix
+
+
+def number1():
+    centroids, dist_matrix = kmeans(iris_data, 3)[:2]
+    colors = np.array(['red', 'green', 'blue'])  # colors for clusters
+    plt.title('3 Clusters, Sepal Length and Sepal width')  # plot of clusters and sepal length and sepal width
+    plt.scatter(iris_data[:, 0], iris_data[:, 1], marker='o')
+    plt.scatter(centroids[:, 0], centroids[:, 1], marker='o', color=colors, s=150)
+    plt.xlabel('Sepal length')
+    plt.ylabel('Sepal width')
     plt.show()
+    plt.title('3 Clusters, Sepal Length and Petal width')  # plot of clusters and sepal length and petal width
+    plt.scatter(iris_data[:, 0], iris_data[:, 3], marker='o')
+    plt.scatter(centroids[:, 0], centroids[:, 3], marker='o', color=colors, s=150)
+    plt.xlabel('Sepal length')
+    plt.ylabel('Petal width')
+    plt.show()
+
+
+def number2():
+    distance_lst = []  # initializing distance list to plot later
+    for i in range(1, 11):
+        centroids, dist_matrix = kmeans(iris_data, i)[:2]  # executing kmeans
+        mean_distance = np.mean(dist_matrix.min(axis=1))  # calculating mean distance
+        distance_lst.append(mean_distance)  # saving mean distance for every ncluster
+    plt.title('Optimal Number of Clusters')  # mean cluster distance for ncluster 1-10
+    plt.plot(list(range(1, 11)), distance_lst)
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Mean Distance')
+    plt.show()
+
+
+if __name__ == '__main__':
+    number1()
+    number2()
